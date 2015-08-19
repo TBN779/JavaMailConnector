@@ -30,7 +30,7 @@ import teamworks.TWObjectFactory;
 /*
  * @author TungNguyen
  * */
-public class JavamailConnector  {
+public class Javamail  {
     Properties properties = null;
     private Session session = null;
     private Store store = null;
@@ -41,7 +41,7 @@ public class JavamailConnector  {
     String toId;
     String returncheck = "";
     
-    public JavamailConnector(){}
+    public Javamail(){}
     
 	public Object processMessageBody(Message message) {
 		Object o = null;
@@ -115,6 +115,7 @@ public class JavamailConnector  {
         });
         
         try {
+        	
             store = session.getStore("imaps");
             store.connect();
             inbox = store.getFolder("INBOX");
@@ -146,7 +147,70 @@ public class JavamailConnector  {
         
     } 
 
-    public TWList returnAllMails(final String userName, final String passWord) throws Exception {
+    public TWList retrieveMail(final String userName, final String passWord, final String id) throws Exception {
+		
+		TWList twList = TWObjectFactory.createList();
+		
+		String temp;
+		
+		SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yy:HH-mm-SS");
+		
+		properties = new Properties();
+		
+		properties.setProperty("mail.host", "imap.gmail.com");
+		
+		properties.setProperty("mail.port", "995");
+		
+		properties.setProperty("mail.transport.protocol", "imaps");
+		
+		session = Session.getInstance(properties, new javax.mail.Authenticator() {
+			
+			protected PasswordAuthentication getPasswordAuthentication() {
+				
+				return new PasswordAuthentication(userName, passWord);
+			}
+			
+		});
+		
+		try {
+			store = session.getStore("imaps");
+			store.connect();
+			inbox = store.getFolder("INBOX");
+			inbox.open(Folder.READ_ONLY);
+			
+			Message messages[] = inbox.search(new FlagTerm( new Flags(Flag.SEEN), false));;
+					
+			for (int i = 0; i < messages.length; i++) {	
+				
+				Message message = messages[i];
+				
+				if(message.getSubject().toString().contains(id)){		
+					
+					Address[] from = message.getFrom();
+					
+					processMessageBody(message);	
+					
+					temp = DATE_FORMAT.format(message.getSentDate());	
+					
+					twList.addArrayData(temp.toString() + "," + from[0].toString() + "," + message.getSubject().toString() + "," + processMessageBody(message).toString());
+                }
+				
+			}
+			
+			inbox.close(true);
+			store.close();
+			
+		} catch (NoSuchProviderException e) {
+			e.printStackTrace();
+		} catch (MessagingException e) {
+			e.printStackTrace();
+		}			
+		
+		return twList;	
+	}
+    
+    
+    public TWList retrieveAllMails(final String userName, final String passWord) throws Exception {
 		
 		TWList twList = TWObjectFactory.createList();
 		String temp;
@@ -171,7 +235,9 @@ public class JavamailConnector  {
 			inbox.open(Folder.READ_ONLY);
 			
 			Message messages[] = inbox.search(new FlagTerm( new Flags(Flag.SEEN), false));;
-					
+			
+			System.out.println("Number of mails = " + messages.length);
+			
 			for (int i = 0; i < messages.length; i++) {
 				Message message = messages[i];
 				Address[] from = message.getFrom();
@@ -188,11 +254,16 @@ public class JavamailConnector  {
 			e.printStackTrace();
 		}	
 		
+		for(int i= 0; i < twList.getArraySize(); i++){
+			System.out.println(twList.getArrayData(i));
+		}
 		
 		return twList;	
 	}
+    
+    
 
-	public void sendMail(final String fromAddress, final String passWord, String toAddress, String subject, String content) throws FileNotFoundException, IOException {
+public void sendMail(final String fromAddress, final String passWord, String toAddress, String subject, String content) throws FileNotFoundException, IOException {
 		
 	    properties = new Properties();
 	    properties.setProperty("mail.smtp.auth", "true");
@@ -205,14 +276,25 @@ public class JavamailConnector  {
 	            return new PasswordAuthentication(fromAddress, passWord);
 	        }
 	    });
+	     
 	    
 	    message = new MimeMessage(session);
+	    
+	    String msg = "Dear " + toAddress + "!<br>";
+        msg += "<font color=#002b54>The payment request need to approve. <br><br> ";       		
+
+        
+        msg += "<p style='font-family:'helvetica neue',arial,Helvetica,sans-serif;text-decoration:none;text-align:center;font-size:14px;display:block;padding:15px 0;color:white;margin-top:10px>";
+        msg += "<a style='text-decoration:none;color:white;background:#7AD385;padding:10px 15px;font-weight:bold;font-size:14px;line-height:30px;white-space:nowrap' href='google.com'>Approve</a></p>";
+        
+        msg += "<p style='font-family:'helvetica neue',arial,Helvetica,sans-serif;text-decoration:none;text-align:center;font-size:14px;display:block;padding:15px 0;color:white;margin-top:10px>";
+        msg += "<a style='text-decoration:none;color:white;background:#BB5A48;padding:10px 15px;font-weight:bold;font-size:14px;line-height:30px;white-space:nowrap' href='google.com'>Reject</a></p>";
 
 	    try {
 	        message.setFrom(new InternetAddress(fromAddress));
 	        message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(toAddress));
 	        message.setSubject(subject);
-	        message.setText(content);
+	        message.setContent(msg, "text/html");
 	        Transport.send(message);
 	    } catch (AddressException e) {
 	        e.printStackTrace();
@@ -221,7 +303,6 @@ public class JavamailConnector  {
 	    } 
 	    
 	}
-	
 
 }
 
