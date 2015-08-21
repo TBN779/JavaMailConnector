@@ -19,13 +19,16 @@ import javax.mail.Session;
 import javax.mail.Store;
 import javax.mail.search.FlagTerm;
 
+import org.jdom.Document;
+import org.jdom.Element;
+
 import teamworks.TWList;
 import teamworks.TWObjectFactory;
 
 /*
  * @author TungNguyen
  * */
-public class ReadMail  {
+public class ReadMailToReturnXMLType  {
     Properties properties = null;
     private Session session = null;
     private Store store = null;
@@ -35,7 +38,7 @@ public class ReadMail  {
     String toId;
     String returncheck = "";
     
-    public ReadMail(){}
+    public ReadMailToReturnXMLType(){}
     
 	public Object processMessageBody(Message message) {
 		Object o = null;
@@ -203,10 +206,11 @@ public class ReadMail  {
 	}
     
     
-    public TWList retrieveAllMails(final String userName, final String passWord) throws Exception {
+    public Element retrieveAllMails(final String userName, final String passWord) throws Exception {
 		
-		TWList twList = TWObjectFactory.createList();
 		String temp;
+		int temp1;
+		Element resultSet = new Element("resultSet");
 		
 		SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yy:HH-mm-SS");
 		
@@ -221,21 +225,54 @@ public class ReadMail  {
 			}
 		});
 		
+		
+		
+		
 		try {
 			store = session.getStore("imaps");
 			store.connect();
 			inbox = store.getFolder("INBOX");
 			inbox.open(Folder.READ_ONLY);
 			
-			Message messages[] = inbox.search(new FlagTerm( new Flags(Flag.SEEN), false));;
+			Message messages[] = inbox.search(new FlagTerm( new Flags(Flag.SEEN), false));
+			temp1 = messages.length;
+			String numberOfMail = Integer.toString(temp1);
+			
+			
+			resultSet.setAttribute("recordCount", numberOfMail);
+			resultSet.setAttribute("columnCount", "-1");
+			Document doc = new Document(resultSet);
+			doc.setRootElement(resultSet);
+			
 			
 			for (int i = 0; i < messages.length; i++) {
 				Message message = messages[i];
 				Address[] from = message.getFrom();
 				processMessageBody(message);				
-				temp = DATE_FORMAT.format(message.getSentDate());				
-				twList.addArrayData(temp.toString() + "," + from[0].toString() + "," + message.getSubject().toString() + "," + processMessageBody(message).toString());
+				temp = DATE_FORMAT.format(message.getSentDate());	
+				
+				
+				Element record = new Element("record");
+				doc.getRootElement().addContent(record);
+
+				Element column = new Element("column");
+				record.addContent(column.setText(temp.toString()));
+				column.setAttribute("name", "MSG_DATE");
+				
+				Element column1 = new Element("column");
+				record.addContent(column1.setText(from[0].toString()));
+				column1.setAttribute("name", "MSG_FROM");
+				
+				Element column2 = new Element("column");
+				record.addContent(column2.setText(message.getSubject().toString()));
+				column2.setAttribute("name", "MSG_SUBJECT");
+				
+				Element column3 = new Element("column");
+				record.addContent(column3.setText(processMessageBody(message).toString()));
+				column3.setAttribute("name", "MSG_CONTENT");					
+				
 			}
+			
 			inbox.close(true);
 			store.close();
 			
@@ -245,10 +282,9 @@ public class ReadMail  {
 			e.printStackTrace();
 		}	
 		
-		return twList;	
+		return resultSet;	
 	}
     
-
     
 }
 
